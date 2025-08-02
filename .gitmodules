@@ -1,0 +1,3 @@
+[submodule "secure-pulse-banking"]
+	path = secure-pulse-banking
+	url = https://github.com/DEBDEEP-BANERJ2E/secure-pulse-banking.git
