@@ -10,35 +10,33 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 
 void main() {
-  runApp(const CalculatorApp());
+  runApp(const SecureBankApp());
 }
 
-class CalculatorApp extends StatelessWidget {
-  const CalculatorApp({Key? key}) : super(key: key);
+class SecureBankApp extends StatelessWidget {
+  const SecureBankApp({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Calculator',
+      title: 'SecureBank Mobile',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
         useMaterial3: true,
       ),
-      home: const CalculatorHomePage(),
+      home: const BankHomePage(),
     );
   }
 }
 
-class CalculatorHomePage extends StatefulWidget {
-  const CalculatorHomePage({Key? key}) : super(key: key);
+class BankHomePage extends StatefulWidget {
+  const BankHomePage({Key? key}) : super(key: key);
 
   @override
-  State<CalculatorHomePage> createState() => _CalculatorHomePageState();
+  State<BankHomePage> createState() => _BankHomePageState();
 }
 
-class _CalculatorHomePageState extends State<CalculatorHomePage> {
-  String _expression = '';
-  String _result = '';
+class _BankHomePageState extends State<BankHomePage> {
   bool _authenticated = false;
   bool _fingerprintRegistered = false;
   String _authStatus = 'Waiting for authentication...';
@@ -46,7 +44,6 @@ class _CalculatorHomePageState extends State<CalculatorHomePage> {
   String _geoIpInfo = '';
   String _simInfo = '';
   bool _simVerified = false;
-  String _deviceInfo = '';
   final LocalAuthentication auth = LocalAuthentication();
 
   // Location Discrepancy Score System
@@ -456,7 +453,6 @@ class _CalculatorHomePageState extends State<CalculatorHomePage> {
             '${androidInfo.id}-${androidInfo.model}-${androidInfo.brand}-${androidInfo.device}';
 
         setState(() {
-          _deviceInfo = 'Device: ${androidInfo.brand} ${androidInfo.model}';
           _simInfo = 'Device ID: ${androidInfo.id}';
         });
 
@@ -708,78 +704,6 @@ class _CalculatorHomePageState extends State<CalculatorHomePage> {
         _authStatus = 'Authentication error: $e';
       });
     }
-  }
-
-  void _onPressed(String value) {
-    setState(() {
-      if (value == 'C') {
-        _expression = '';
-        _result = '';
-      } else if (value == '=') {
-        try {
-          _result = _calculateResult(_expression);
-        } catch (e) {
-          _result = 'Error';
-        }
-      } else {
-        _expression += value;
-      }
-    });
-  }
-
-  String _calculateResult(String expr) {
-    expr = expr.replaceAll('×', '*').replaceAll('÷', '/');
-    try {
-      final result = _eval(expr);
-      return result.toString();
-    } catch (e) {
-      return 'Error';
-    }
-  }
-
-  double _eval(String expr) {
-    List<String> tokens = expr
-        .split(RegExp(r'([+\-*/])'))
-        .where((t) => t.isNotEmpty)
-        .toList();
-    List<String> ops = expr.split('').where((c) => '+-*/'.contains(c)).toList();
-    if (tokens.isEmpty) return 0;
-    double total = double.tryParse(tokens[0]) ?? 0;
-    for (int i = 0; i < ops.length; i++) {
-      double next = double.tryParse(tokens[i + 1]) ?? 0;
-      switch (ops[i]) {
-        case '+':
-          total += next;
-          break;
-        case '-':
-          total -= next;
-          break;
-        case '*':
-          total *= next;
-          break;
-        case '/':
-          total /= next;
-          break;
-      }
-    }
-    return total;
-  }
-
-  Widget _buildButton(String value, {Color? color}) {
-    return Expanded(
-      child: Padding(
-        padding: const EdgeInsets.all(4.0),
-        child: ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: color ?? Colors.grey[200],
-            foregroundColor: Colors.black,
-            padding: const EdgeInsets.symmetric(vertical: 24),
-          ),
-          onPressed: () => _onPressed(value),
-          child: Text(value, style: const TextStyle(fontSize: 24)),
-        ),
-      ),
-    );
   }
 
   @override

@@ -1,5 +1,5 @@
-name: flutter_application_1
-description: A new Flutter project.
+name: secure_bank_mobile
+description: A secure banking application with advanced fraud detection and location-based security features.
 
 # Prevents publishing to pub.dev
 publish_to: 'none' 
