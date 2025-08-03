@@ -1,0 +1,42 @@
+name: flutter_application_1
+description: A new Flutter project.
+
+# Prevents publishing to pub.dev
+publish_to: 'none' 
+
+# Versioning
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.8.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+  local_auth: ^2.1.0
+  cupertino_icons: ^1.0.8
+  geolocator: ^9.0.2
+  http: ^1.1.0
+  permission_handler: ^11.0.1
+  device_info_plus: ^10.1.0
+  shared_preferences: ^2.2.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.1  # Updated version since ^5.0.0 does not exist as of now
+
+flutter:
+  uses-material-design: true
+
+  # To add assets, uncomment and add your asset paths like below:
+  # assets:
+  #   - assets/images/
+
+  # To add custom fonts, use the following structure:
+  # fonts:
+  #   - family: MyFont
+  #     fonts:
+  #       - asset: fonts/MyFont-Regular.ttf
+  #       - asset: fonts/MyFont-Bold.ttf
+  #         weight: 700
