@@ -8,6 +8,7 @@ import 'dart:io';
 import 'dart:math';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:device_info_plus/device_info_plus.dart';
+import 'package:crypto/crypto.dart';
 
 void main() {
   runApp(const SecureBankApp());
@@ -24,7 +25,548 @@ class SecureBankApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
         useMaterial3: true,
       ),
-      home: const BankHomePage(),
+      home: const LoginPage(),
+    );
+  }
+}
+
+// User Management Class
+class UserManager {
+  static const String _usersKey = 'registered_users';
+  static const String _currentUserKey = 'current_user';
+
+  static Future<bool> registerUser(
+    String username,
+    String password,
+    String email,
+  ) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    List<String> users = prefs.getStringList(_usersKey) ?? [];
+
+    // Check if user already exists
+    for (String userData in users) {
+      Map<String, dynamic> user = json.decode(userData);
+      if (user['username'] == username || user['email'] == email) {
+        return false; // User already exists
+      }
+    }
+
+    // Hash password for security
+    var bytes = utf8.encode(password);
+    var digest = sha256.convert(bytes);
+
+    Map<String, dynamic> newUser = {
+      'username': username,
+      'password': digest.toString(),
+      'email': email,
+      'created_at': DateTime.now().toIso8601String(),
+      'user_id': DateTime.now().millisecondsSinceEpoch.toString(),
+    };
+
+    users.add(json.encode(newUser));
+    await prefs.setStringList(_usersKey, users);
+    return true;
+  }
+
+  static Future<Map<String, dynamic>?> loginUser(
+    String username,
+    String password,
+  ) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    List<String> users = prefs.getStringList(_usersKey) ?? [];
+
+    // Hash input password
+    var bytes = utf8.encode(password);
+    var digest = sha256.convert(bytes);
+
+    for (String userData in users) {
+      Map<String, dynamic> user = json.decode(userData);
+      if ((user['username'] == username || user['email'] == username) &&
+          user['password'] == digest.toString()) {
+        // Save current user
+        await prefs.setString(_currentUserKey, userData);
+        return user;
+      }
+    }
+    return null;
+  }
+
+  static Future<Map<String, dynamic>?> getCurrentUser() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? userData = prefs.getString(_currentUserKey);
+    if (userData != null) {
+      return json.decode(userData);
+    }
+    return null;
+  }
+
+  static Future<void> logoutUser() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_currentUserKey);
+  }
+
+  // Debug method to view all registered users
+  static Future<void> printAllUsers() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    List<String> users = prefs.getStringList(_usersKey) ?? [];
+
+    print('=== REGISTERED USERS DEBUG ===');
+    print('Total users: ${users.length}');
+
+    for (int i = 0; i < users.length; i++) {
+      Map<String, dynamic> user = json.decode(users[i]);
+      print('User ${i + 1}:');
+      print('  Username: ${user['username']}');
+      print('  Email: ${user['email']}');
+      print('  User ID: ${user['user_id']}');
+      print('  Created: ${user['created_at']}');
+      print('  Password Hash: ${user['password'].substring(0, 20)}...');
+      print('---');
+    }
+    print('===============================');
+  }
+
+  // Method to clear all user data (for testing)
+  static Future<void> clearAllUsers() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_usersKey);
+    await prefs.remove(_currentUserKey);
+    print('All user data cleared from SharedPreferences');
+  }
+}
+
+// Login Page Class
+class LoginPage extends StatefulWidget {
+  const LoginPage({Key? key}) : super(key: key);
+
+  @override
+  State<LoginPage> createState() => _LoginPageState();
+}
+
+class _LoginPageState extends State<LoginPage> {
+  final _formKey = GlobalKey<FormState>();
+  final _usernameController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _emailController = TextEditingController();
+
+  bool _isLogin = true;
+  bool _isLoading = false;
+  bool _obscurePassword = true;
+  String _statusMessage = '';
+
+  @override
+  void dispose() {
+    _usernameController.dispose();
+    _passwordController.dispose();
+    _emailController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleAuth() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() {
+      _isLoading = true;
+      _statusMessage = '';
+    });
+
+    try {
+      if (_isLogin) {
+        // Login
+        Map<String, dynamic>? user = await UserManager.loginUser(
+          _usernameController.text.trim(),
+          _passwordController.text,
+        );
+
+        if (user != null) {
+          if (mounted) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const BankHomePage()),
+            );
+          }
+        } else {
+          setState(() {
+            _statusMessage = 'Invalid username/email or password';
+          });
+        }
+      } else {
+        // Register
+        bool success = await UserManager.registerUser(
+          _usernameController.text.trim(),
+          _passwordController.text,
+          _emailController.text.trim(),
+        );
+
+        if (success) {
+          setState(() {
+            _statusMessage = 'Registration successful! Please login.';
+            _isLogin = true;
+          });
+          _clearForm();
+        } else {
+          setState(() {
+            _statusMessage = 'Username or email already exists';
+          });
+        }
+      }
+    } catch (e) {
+      setState(() {
+        _statusMessage = 'An error occurred: $e';
+      });
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _clearForm() {
+    _usernameController.clear();
+    _passwordController.clear();
+    _emailController.clear();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.grey[100],
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24.0),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Bank Logo
+                  Container(
+                    width: 120,
+                    height: 120,
+                    decoration: BoxDecoration(
+                      color: Colors.blue[700],
+                      borderRadius: BorderRadius.circular(60),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.blue.withOpacity(0.3),
+                          spreadRadius: 2,
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.account_balance,
+                      size: 60,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // App Title
+                  const Text(
+                    'SecureBank Mobile',
+                    style: TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Your Security is Our Priority',
+                    style: TextStyle(fontSize: 16, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 40),
+
+                  // Login/Register Toggle
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.grey[200],
+                      borderRadius: BorderRadius.circular(25),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () => setState(() {
+                              _isLogin = true;
+                              _statusMessage = '';
+                              _clearForm();
+                            }),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                color: _isLogin
+                                    ? Colors.blue[700]
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(25),
+                              ),
+                              child: Text(
+                                'Login',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: _isLogin
+                                      ? Colors.white
+                                      : Colors.grey[600],
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () => setState(() {
+                              _isLogin = false;
+                              _statusMessage = '';
+                              _clearForm();
+                            }),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                color: !_isLogin
+                                    ? Colors.blue[700]
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(25),
+                              ),
+                              child: Text(
+                                'Register',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: !_isLogin
+                                      ? Colors.white
+                                      : Colors.grey[600],
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+
+                  // Form Fields
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withOpacity(0.1),
+                          spreadRadius: 1,
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      children: [
+                        // Username/Email Field
+                        TextFormField(
+                          controller: _usernameController,
+                          decoration: InputDecoration(
+                            labelText: _isLogin
+                                ? 'Username or Email'
+                                : 'Username',
+                            prefixIcon: const Icon(Icons.person),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            filled: true,
+                            fillColor: Colors.grey[50],
+                          ),
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Please enter your ${_isLogin ? 'username or email' : 'username'}';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Email Field (only for registration)
+                        if (!_isLogin) ...[
+                          TextFormField(
+                            controller: _emailController,
+                            decoration: InputDecoration(
+                              labelText: 'Email',
+                              prefixIcon: const Icon(Icons.email),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              filled: true,
+                              fillColor: Colors.grey[50],
+                            ),
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Please enter your email';
+                              }
+                              if (!RegExp(
+                                r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+                              ).hasMatch(value)) {
+                                return 'Please enter a valid email';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+
+                        // Password Field
+                        TextFormField(
+                          controller: _passwordController,
+                          obscureText: _obscurePassword,
+                          decoration: InputDecoration(
+                            labelText: 'Password',
+                            prefixIcon: const Icon(Icons.lock),
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _obscurePassword
+                                    ? Icons.visibility
+                                    : Icons.visibility_off,
+                              ),
+                              onPressed: () => setState(
+                                () => _obscurePassword = !_obscurePassword,
+                              ),
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            filled: true,
+                            fillColor: Colors.grey[50],
+                          ),
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter your password';
+                            }
+                            if (!_isLogin && value.length < 6) {
+                              return 'Password must be at least 6 characters';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 24),
+
+                        // Status Message
+                        if (_statusMessage.isNotEmpty) ...[
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: _statusMessage.contains('successful')
+                                  ? Colors.green[50]
+                                  : Colors.red[50],
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: _statusMessage.contains('successful')
+                                    ? Colors.green[300]!
+                                    : Colors.red[300]!,
+                              ),
+                            ),
+                            child: Text(
+                              _statusMessage,
+                              style: TextStyle(
+                                color: _statusMessage.contains('successful')
+                                    ? Colors.green[700]
+                                    : Colors.red[700],
+                                fontWeight: FontWeight.w500,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+
+                        // Submit Button
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: _isLoading ? null : _handleAuth,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blue[700],
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              elevation: 2,
+                            ),
+                            child: _isLoading
+                                ? const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.white,
+                                      ),
+                                    ),
+                                  )
+                                : Text(
+                                    _isLogin ? 'Login' : 'Register',
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Debug Buttons (for development)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      TextButton(
+                        onPressed: () async {
+                          await UserManager.printAllUsers();
+                          setState(() {
+                            _statusMessage = 'Check console for user data';
+                          });
+                        },
+                        child: const Text(
+                          'View Users',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () async {
+                          await UserManager.clearAllUsers();
+                          setState(() {
+                            _statusMessage = 'All user data cleared';
+                          });
+                        },
+                        child: const Text(
+                          'Clear Data',
+                          style: TextStyle(fontSize: 12, color: Colors.red),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Additional Info
+                  Text(
+                    _isLogin
+                        ? "Don't have an account? Tap Register above"
+                        : "Already have an account? Tap Login above",
+                    style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -46,6 +588,13 @@ class _BankHomePageState extends State<BankHomePage> {
   bool _simVerified = false;
   final LocalAuthentication auth = LocalAuthentication();
 
+  // SIM Change Detection Variables
+  String _currentSimSerial = '';
+  String _currentCarrierName = '';
+  String _currentImei = '';
+  Map<String, dynamic>? _simChangeAlert;
+  double _simRiskScore = 0.0;
+
   // Location Discrepancy Score System
   List<Map<String, dynamic>> _sessionData = [];
   double _currentDiscrepancyScore = 0.0;
@@ -60,6 +609,7 @@ class _BankHomePageState extends State<BankHomePage> {
     _checkBiometricStatus();
     _checkLocationAndGeoIP();
     _checkDeviceInfo();
+    _checkSimInfo();
   }
 
   // Location Discrepancy Score System Methods
@@ -500,6 +1050,334 @@ class _BankHomePageState extends State<BankHomePage> {
     }
   }
 
+  // SIM Change Detection Methods
+  Future<void> _checkSimInfo() async {
+    try {
+      if (Platform.isAndroid) {
+        // Get device info for IMEI
+        DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
+        AndroidDeviceInfo androidInfo = await deviceInfo.androidInfo;
+        _currentImei = androidInfo.id;
+
+        // Simulate SIM info gathering (since real SIM APIs may need special permissions)
+        _currentSimSerial = 'SIM_${DateTime.now().millisecondsSinceEpoch}';
+        _currentCarrierName = await _getCarrierName();
+
+        // Check for SIM changes
+        await _detectSimChanges();
+      } else {
+        setState(() {
+          _simInfo = '${_simInfo}\nSIM check bypassed (iOS/Other platform)';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _simInfo = '${_simInfo}\nSIM Check Error: $e';
+      });
+    }
+  }
+
+  Future<String> _getCarrierName() async {
+    try {
+      // Simulate carrier detection - in a real app you'd use telephony APIs
+      List<String> carriers = [
+        'Verizon',
+        'AT&T',
+        'T-Mobile',
+        'Sprint',
+        'Other',
+      ];
+      return carriers[Random().nextInt(carriers.length)];
+    } catch (e) {
+      return 'Unknown Carrier';
+    }
+  }
+
+  Future<void> _detectSimChanges() async {
+    try {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+
+      // Get stored SIM info
+      String? storedSimSerial = prefs.getString('stored_sim_serial');
+      String? storedCarrier = prefs.getString('stored_carrier');
+      String? storedImei = prefs.getString('stored_imei');
+      String? lastSimChangeTime = prefs.getString('last_sim_change_time');
+
+      Map<String, dynamic> currentSimData = {
+        'sim_serial': _currentSimSerial,
+        'carrier': _currentCarrierName,
+        'imei': _currentImei,
+        'timestamp': DateTime.now().toIso8601String(),
+      };
+
+      double riskScore = 0.0;
+      List<String> alerts = [];
+
+      // First time setup
+      if (storedSimSerial == null) {
+        await prefs.setString('stored_sim_serial', _currentSimSerial);
+        await prefs.setString('stored_carrier', _currentCarrierName);
+        await prefs.setString('stored_imei', _currentImei);
+        await prefs.setString(
+          'last_sim_change_time',
+          DateTime.now().toIso8601String(),
+        );
+
+        setState(() {
+          _simInfo = '${_simInfo}\n🟢 SIM Registered: $_currentCarrierName';
+        });
+        return;
+      }
+
+      // Check for SIM serial change (High Risk)
+      if (storedSimSerial != _currentSimSerial) {
+        riskScore += 60.0;
+        alerts.add('🔴 SIM Card Changed');
+
+        // Check time since last change
+        if (lastSimChangeTime != null) {
+          DateTime lastChange = DateTime.parse(lastSimChangeTime);
+          Duration timeDiff = DateTime.now().difference(lastChange);
+
+          if (timeDiff.inDays < 7) {
+            riskScore += 30.0;
+            alerts.add('⚠️ Frequent SIM Changes (< 7 days)');
+          }
+        }
+
+        // Update stored SIM info
+        await prefs.setString('stored_sim_serial', _currentSimSerial);
+        await prefs.setString(
+          'last_sim_change_time',
+          DateTime.now().toIso8601String(),
+        );
+      }
+
+      // Check for carrier change with same SIM (Medium Risk)
+      if (storedSimSerial == _currentSimSerial &&
+          storedCarrier != _currentCarrierName) {
+        riskScore += 25.0;
+        alerts.add('🟡 Carrier Changed');
+        await prefs.setString('stored_carrier', _currentCarrierName);
+      }
+
+      // Check for IMEI change (Critical Risk)
+      if (storedImei != _currentImei) {
+        riskScore += 40.0;
+        alerts.add('🔴 Device IMEI Changed');
+        await prefs.setString('stored_imei', _currentImei);
+      }
+
+      // Store SIM change data for analysis
+      String? simHistoryJson = prefs.getString('sim_change_history');
+      List<Map<String, dynamic>> simHistory = [];
+      if (simHistoryJson != null) {
+        List<dynamic> decodedHistory = json.decode(simHistoryJson);
+        simHistory = decodedHistory.cast<Map<String, dynamic>>();
+      }
+
+      if (alerts.isNotEmpty) {
+        simHistory.add({
+          'timestamp': DateTime.now().toIso8601String(),
+          'alerts': alerts,
+          'risk_score': riskScore,
+          'sim_data': currentSimData,
+        });
+
+        // Keep only last 10 SIM change records
+        if (simHistory.length > 10) {
+          simHistory = simHistory.sublist(simHistory.length - 10);
+        }
+
+        await prefs.setString('sim_change_history', json.encode(simHistory));
+      }
+
+      // Update state
+      setState(() {
+        _simRiskScore = riskScore;
+        _simChangeAlert = alerts.isNotEmpty
+            ? {
+                'alerts': alerts,
+                'risk_score': riskScore,
+                'timestamp': DateTime.now().toIso8601String(),
+              }
+            : null;
+
+        if (alerts.isNotEmpty) {
+          _simInfo =
+              '${_simInfo}\n${alerts.join(', ')} (Risk: ${riskScore.toStringAsFixed(1)})';
+        } else {
+          _simInfo = '${_simInfo}\n🟢 SIM Verified: $_currentCarrierName';
+        }
+      });
+
+      // Additional security measures for high risk
+      if (riskScore > 50.0) {
+        setState(() {
+          _simVerified = false;
+          _authStatus =
+              'SECURITY ALERT: SIM change detected. Access restricted.';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _simInfo = '${_simInfo}\nSIM Detection Error: $e';
+      });
+    }
+  }
+
+  void _showSimChangeDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('📱 SIM Change Detection'),
+        content: SizedBox(
+          width: double.maxFinite,
+          height: 300,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Current SIM Info
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.blue[200]!),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Current SIM Info',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Carrier: $_currentCarrierName',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    Text(
+                      'Serial: ${_currentSimSerial.substring(0, min(20, _currentSimSerial.length))}...',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    Text(
+                      'IMEI: ${_currentImei.substring(0, min(15, _currentImei.length))}...',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Risk Score
+              if (_simRiskScore > 0) ...[
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: _getSimRiskColor().withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: _getSimRiskColor()),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        _getSimRiskIcon(),
+                        color: _getSimRiskColor(),
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'SIM Risk Score: ${_simRiskScore.toStringAsFixed(1)}/100',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: _getSimRiskColor(),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+
+              // Recent Alerts
+              if (_simChangeAlert != null) ...[
+                const Text(
+                  'Recent Alerts',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                ...(_simChangeAlert!['alerts'] as List<String>).map(
+                  (alert) => Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.warning,
+                          color: Colors.orange,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            alert,
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ] else ...[
+                const Row(
+                  children: [
+                    Icon(Icons.check_circle, color: Colors.green, size: 20),
+                    SizedBox(width: 8),
+                    Text('No SIM security alerts'),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              // Reset SIM history for testing
+              SharedPreferences prefs = await SharedPreferences.getInstance();
+              await prefs.remove('stored_sim_serial');
+              await prefs.remove('stored_carrier');
+              await prefs.remove('stored_imei');
+              await prefs.remove('sim_change_history');
+              Navigator.of(context).pop();
+              _checkSimInfo();
+            },
+            child: const Text('Reset SIM Data'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color _getSimRiskColor() {
+    if (_simRiskScore < 25) return Colors.green;
+    if (_simRiskScore < 50) return Colors.orange;
+    return Colors.red;
+  }
+
+  IconData _getSimRiskIcon() {
+    if (_simRiskScore < 25) return Icons.check_circle;
+    if (_simRiskScore < 50) return Icons.warning;
+    return Icons.error;
+  }
+
   Future<void> _checkLocationAndGeoIP() async {
     await _getCurrentLocation();
     await _getGeoIPInfo();
@@ -804,6 +1682,14 @@ class _BankHomePageState extends State<BankHomePage> {
                         _simInfo.isEmpty ? 'Validating...' : _simInfo,
                         _simVerified,
                       ),
+                      _buildSecurityItem(
+                        Icons.sim_card,
+                        'SIM Security',
+                        _simRiskScore > 0
+                            ? 'Risk Score: ${_simRiskScore.toStringAsFixed(1)}/100'
+                            : 'SIM Verified',
+                        _simRiskScore < 50,
+                      ),
                       if (_currentDiscrepancyScore > 0) ...[
                         const SizedBox(height: 8),
                         Container(
@@ -944,7 +1830,12 @@ class _BankHomePageState extends State<BankHomePage> {
           IconButton(
             icon: const Icon(Icons.analytics),
             onPressed: () => _showLocationDiscrepancyDialog(),
-            tooltip: 'Security Analytics',
+            tooltip: 'Location Analytics',
+          ),
+          IconButton(
+            icon: const Icon(Icons.sim_card),
+            onPressed: () => _showSimChangeDialog(),
+            tooltip: 'SIM Analytics',
           ),
           IconButton(
             icon: const Icon(Icons.notifications_outlined),
@@ -953,11 +1844,14 @@ class _BankHomePageState extends State<BankHomePage> {
           ),
           IconButton(
             icon: const Icon(Icons.logout),
-            onPressed: () {
-              setState(() {
-                _authenticated = false;
-                _authStatus = 'Logged out. Please authenticate again.';
-              });
+            onPressed: () async {
+              await UserManager.logoutUser();
+              if (mounted) {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => const LoginPage()),
+                );
+              }
             },
             tooltip: 'Logout',
           ),
@@ -1371,6 +2265,13 @@ class _BankHomePageState extends State<BankHomePage> {
               'Risk Score: ${_getSecurityRiskLevel(_currentDiscrepancyScore)}',
               'Now',
             ),
+            if (_simChangeAlert != null)
+              _buildNotificationItem(
+                Icons.sim_card,
+                'SIM Security Alert',
+                'Risk Score: ${_simRiskScore.toStringAsFixed(1)}/100',
+                'Now',
+              ),
           ],
         ),
         actions: [
@@ -1598,6 +2499,7 @@ class _BankHomePageState extends State<BankHomePage> {
             _buildMoreOption(Icons.help, 'Help & Support'),
             _buildMoreOption(Icons.security, 'Security Settings'),
             _buildMoreOption(Icons.analytics, 'View Location Analytics'),
+            _buildMoreOption(Icons.sim_card, 'View SIM Analytics'),
             _buildMoreOption(Icons.receipt_long, 'Transaction History'),
             _buildMoreOption(Icons.account_circle, 'Profile Management'),
           ],
@@ -1618,6 +2520,8 @@ class _BankHomePageState extends State<BankHomePage> {
         Navigator.of(context).pop();
         if (title == 'View Location Analytics') {
           _showLocationDiscrepancyDialog();
+        } else if (title == 'View SIM Analytics') {
+          _showSimChangeDialog();
         }
       },
       child: Container(
