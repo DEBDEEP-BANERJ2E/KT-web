@@ -1,0 +1,43 @@
+2025-08-15 07:25:12,373 - __main__ - INFO - 🚀 Starting Behavioral Biometrics Authentication System
+2025-08-15 07:25:12,373 - __main__ - INFO - ✅ Environment setup completed
+2025-08-15 07:25:12,373 - __main__ - INFO - 🔍 Validating system configuration...
+2025-08-15 07:25:12,374 - __main__ - WARNING - ⚠️  TYPINGDNA_API_KEY: Not configured (optional)
+2025-08-15 07:25:12,374 - __main__ - WARNING - ⚠️  TYPINGDNA_API_SECRET: Not configured (optional)
+2025-08-15 07:25:12,374 - __main__ - WARNING - ⚠️  EMAIL_USER: Not configured (optional)
+2025-08-15 07:25:12,374 - __main__ - WARNING - ⚠️  EMAIL_PASSWORD: Not configured (optional)
+2025-08-15 07:25:12,374 - __main__ - WARNING - ⚠️  WEBHOOK_URL: Not configured (optional)
+2025-08-15 07:25:12,374 - __main__ - WARNING - ⚠️  GOOGLE_DRIVE_FOLDER_ID: Not configured (optional)
+2025-08-15 07:25:12,374 - __main__ - INFO - ✅ Directory models: OK
+2025-08-15 07:25:12,374 - __main__ - INFO - ✅ Directory data: OK
+2025-08-15 07:25:12,374 - __main__ - INFO - ✅ Directory exports: OK
+2025-08-15 07:25:12,374 - __main__ - INFO - ✅ Directory logs: OK
+2025-08-15 07:25:12,375 - __main__ - INFO - ✅ Directory static: OK
+2025-08-15 07:25:12,375 - __main__ - INFO - ✅ Configuration validation completed
+2025-08-15 07:25:12,375 - __main__ - INFO - 🔧 Starting FastAPI backend server...
+2025-08-15 07:25:15,375 - __main__ - INFO - ✅ FastAPI backend started on port 8000
+2025-08-15 07:25:15,376 - __main__ - INFO - 🎨 Starting Gradio frontend interface...
+2025-08-15 07:25:17,377 - __main__ - INFO - ✅ Gradio frontend started on port 5000
+2025-08-15 07:25:17,725 - httpx - INFO - HTTP Request: GET https://api.gradio.app/pkg-version "HTTP/1.1 200 OK"
+2025-08-15 07:25:18,819 - matplotlib.font_manager - INFO - generated new fontManager
+2025-08-15 07:25:19,640 - __main__ - ERROR - ❌ Gradio server error: 'Column' object has no attribute 'load'
+2025-08-15 07:26:15,856 - __main__ - INFO - 🚀 Starting Behavioral Biometrics Authentication System
+2025-08-15 07:26:15,857 - __main__ - INFO - ✅ Environment setup completed
+2025-08-15 07:26:15,857 - __main__ - INFO - 🔍 Validating system configuration...
+2025-08-15 07:26:15,857 - __main__ - WARNING - ⚠️  TYPINGDNA_API_KEY: Not configured (optional)
+2025-08-15 07:26:15,857 - __main__ - WARNING - ⚠️  TYPINGDNA_API_SECRET: Not configured (optional)
+2025-08-15 07:26:15,857 - __main__ - WARNING - ⚠️  EMAIL_USER: Not configured (optional)
+2025-08-15 07:26:15,857 - __main__ - WARNING - ⚠️  EMAIL_PASSWORD: Not configured (optional)
+2025-08-15 07:26:15,857 - __main__ - WARNING - ⚠️  WEBHOOK_URL: Not configured (optional)
+2025-08-15 07:26:15,858 - __main__ - WARNING - ⚠️  GOOGLE_DRIVE_FOLDER_ID: Not configured (optional)
+2025-08-15 07:26:15,858 - __main__ - INFO - ✅ Directory models: OK
+2025-08-15 07:26:15,858 - __main__ - INFO - ✅ Directory data: OK
+2025-08-15 07:26:15,858 - __main__ - INFO - ✅ Directory exports: OK
+2025-08-15 07:26:15,858 - __main__ - INFO - ✅ Directory logs: OK
+2025-08-15 07:26:15,858 - __main__ - INFO - ✅ Directory static: OK
+2025-08-15 07:26:15,858 - __main__ - INFO - ✅ Configuration validation completed
+2025-08-15 07:26:15,858 - __main__ - INFO - 🔧 Starting FastAPI backend server...
+2025-08-15 07:26:18,859 - __main__ - INFO - ✅ FastAPI backend started on port 8000
+2025-08-15 07:26:18,861 - __main__ - INFO - 🎨 Starting Gradio frontend interface...
+2025-08-15 07:26:20,861 - __main__ - INFO - ✅ Gradio frontend started on port 5000
+2025-08-15 07:26:21,229 - httpx - INFO - HTTP Request: GET https://api.gradio.app/pkg-version "HTTP/1.1 200 OK"
+2025-08-15 07:26:21,573 - __main__ - ERROR - ❌ Gradio server error: 'Column' object has no attribute 'load'

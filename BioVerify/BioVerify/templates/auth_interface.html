@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Behavioral Biometrics Authentication</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.typingdna.com/typingdna-3.0.0.min.js"></script>
+    <script src="/static/typing_recorder.js"></script>
+    <script src="/static/biometrics.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>🔐 Behavioral Biometrics Authentication</h1>
+            <p class="subtitle">Real-time typing dynamics and continuous authentication</p>
+        </header>
+
+        <!-- Authentication Status -->
+        <div id="auth-status" class="auth-status low">
+            Ready for authentication
+        </div>
+
+        <!-- Main Authentication Interface -->
+        <div class="card">
+            <div class="card-header">
+                <h2>Authentication Interface</h2>
+            </div>
+            <div class="card-body">
+                <!-- User Selection -->
+                <div class="form-group">
+                    <label for="user-id" class="form-label">User ID</label>
+                    <input type="text" id="user-id" class="form-control" placeholder="Enter your user ID" required>
+                </div>
+
+                <!-- Typing Interface -->
+                <div class="form-group">
+                    <label for="typing-area" class="form-label">Type the following text naturally:</label>
+                    <div id="prompt-text" class="typing-prompt">
+                        Please type this sentence naturally for authentication: "The quick brown fox jumps over the lazy dog."
+                    </div>
+                    <textarea id="typing-area" class="form-control" rows="4" 
+                              placeholder="Start typing here..." 
+                              style="font-size: 16px; line-height: 1.5;"></textarea>
+                    <div class="form-text">
+                        Type naturally as you normally would. Your typing pattern is being analyzed.
+                    </div>
+                </div>
+
+                <!-- Progress Indicator -->
+                <div class="progress">
+                    <div id="progress-bar" class="progress-bar" style="width: 0%">0%</div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div style="margin-top: 20px;">
+                    <button id="start-capture-btn" class="btn btn-primary">Start Capture</button>
+                    <button id="authenticate-btn" class="btn btn-success" disabled>Authenticate</button>
+                    <button id="enroll-btn" class="btn btn-secondary">Enroll Pattern</button>
+                    <button id="reset-btn" class="btn btn-warning">Reset</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Display -->
+        <div class="card">
+            <div class="card-header">
+                <h3>Authentication Results</h3>
+            </div>
+            <div class="card-body">
+                <div id="results-container">
+                    <p>Start typing to see authentication results...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Biometric Features Display -->
+        <div class="card">
+            <div class="card-header">
+                <h3>Captured Biometric Features</h3>
+            </div>
+            <div class="card-body">
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-value" id="dwell-time">--</div>
+                        <div class="metric-label">Avg Dwell Time (ms)</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="flight-time">--</div>
+                        <div class="metric-label">Avg Flight Time (ms)</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="typing-speed">--</div>
+                        <div class="metric-label">Typing Speed (WPM)</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="rhythm-score">--</div>
+                        <div class="metric-label">Rhythm Consistency</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Continuous Authentication Control -->
+        <div class="card">
+            <div class="card-header">
+                <h3>Continuous Authentication</h3>
+            </div>
+            <div class="card-body">
+                <p>Enable continuous authentication for real-time monitoring:</p>
+                <button id="start-continuous-btn" class="btn btn-info">Start Continuous Auth</button>
+                <button id="stop-continuous-btn" class="btn btn-danger" disabled>Stop Continuous Auth</button>
+                
+                <div id="continuous-status" style="margin-top: 15px;">
+                    Continuous authentication is disabled
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Step-up Authentication Modal (Hidden by default) -->
+    <div id="step-up-modal" class="step-up-modal" style="display: none;">
+        <div class="modal-content">
+            <h3>🔐 Additional Verification Required</h3>
+            <p>Our system has detected unusual typing patterns that require additional verification.</p>
+            <p>Please enter the verification code sent to your email:</p>
+            <input type="text" id="otp-input" class="form-control" placeholder="Enter 6-digit OTP" maxlength="6">
+            <div class="modal-buttons">
+                <button id="verify-otp-btn" class="btn btn-primary">Verify</button>
+                <button id="cancel-otp-btn" class="btn btn-secondary">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let isCapturing = false;
+        let captureStartTime = null;
+        let currentFeatures = null;
+        let continuousAuthActive = false;
+
+        // DOM elements
+        const userIdInput = document.getElementById('user-id');
+        const typingArea = document.getElementById('typing-area');
+        const startCaptureBtn = document.getElementById('start-capture-btn');
+        const authenticateBtn = document.getElementById('authenticate-btn');
+        const enrollBtn = document.getElementById('enroll-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const progressBar = document.getElementById('progress-bar');
+        const resultsContainer = document.getElementById('results-container');
+        const authStatus = document.getElementById('auth-status');
+
+        // Continuous authentication controls
+        const startContinuousBtn = document.getElementById('start-continuous-btn');
+        const stopContinuousBtn = document.getElementById('stop-continuous-btn');
+        const continuousStatus = document.getElementById('continuous-status');
+
+        // Step-up authentication modal
+        const stepUpModal = document.getElementById('step-up-modal');
+        const otpInput = document.getElementById('otp-input');
+        const verifyOtpBtn = document.getElementById('verify-otp-btn');
+        const cancelOtpBtn = document.getElementById('cancel-otp-btn');
+
+        // Initialize application
+        document.addEventListener('DOMContentLoaded', function() {
+            setupEventListeners();
+            updateProgress();
+        });
+
+        function setupEventListeners() {
+            // Main authentication buttons
+            startCaptureBtn.addEventListener('click', startCapture);
+            authenticateBtn.addEventListener('click', authenticate);
+            enrollBtn.addEventListener('click', enrollPattern);
+            resetBtn.addEventListener('click', resetCapture);
+
+            // Continuous authentication
+            startContinuousBtn.addEventListener('click', startContinuousAuth);
+            stopContinuousBtn.addEventListener('click', stopContinuousAuth);
+
+            // Step-up authentication
+            verifyOtpBtn.addEventListener('click', verifyOTP);
+            cancelOtpBtn.addEventListener('click', closeStepUpModal);
+
+            // Typing area events
+            typingArea.addEventListener('input', updateProgress);
+            typingArea.addEventListener('focus', function() {
+                if (!isCapturing) {
+                    startCapture();
+                }
+            });
+
+            // User ID validation
+            userIdInput.addEventListener('input', validateForm);
+        }
+
+        function startCapture() {
+            if (!userIdInput.value.trim()) {
+                alert('Please enter a User ID first');
+                userIdInput.focus();
+                return;
+            }
+
+            isCapturing = true;
+            captureStartTime = Date.now();
+            
+            // Start biometric capture
+            window.BiometricAuth.startCapture();
+            window.BiometricUtils.startTypingCapture('typing-area');
+            
+            // Update UI
+            startCaptureBtn.disabled = true;
+            authenticateBtn.disabled = false;
+            enrollBtn.disabled = false;
+            typingArea.disabled = false;
+            typingArea.focus();
+            
+            authStatus.textContent = 'Capturing biometric data...';
+            authStatus.className = 'auth-status medium';
+            
+            console.log('Biometric capture started');
+        }
+
+        function stopCapture() {
+            if (!isCapturing) return;
+            
+            isCapturing = false;
+            
+            // Stop captures and get features
+            const biometricData = window.BiometricAuth.stopCapture();
+            const typingData = window.BiometricUtils.stopTypingCapture();
+            
+            // Combine features
+            currentFeatures = {
+                ...biometricData.features,
+                ...typingData.features
+            };
+            
+            // Update feature display
+            updateFeatureDisplay(currentFeatures);
+            
+            console.log('Captured features:', currentFeatures);
+            return currentFeatures;
+        }
+
+        async function authenticate() {
+            const features = stopCapture();
+            if (!features) return;
+            
+            const userId = userIdInput.value.trim();
+            
+            try {
+                authStatus.textContent = 'Authenticating...';
+                authStatus.className = 'auth-status medium';
+                
+                const response = await fetch('/authenticate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        user_id: userId,
+                        features: features,
+                        session_id: 'web_' + Date.now(),
+                        device_info: window.biometricCapture.deviceInfo
+                    })
+                });
+                
+                const result = await response.json();
+                displayAuthenticationResult(result);
+                
+                // Handle step-up authentication if required
+                if (result.requires_step_up) {
+                    showStepUpModal();
+                }
+                
+            } catch (error) {
+                console.error('Authentication error:', error);
+                authStatus.textContent = 'Authentication failed: ' + error.message;
+                authStatus.className = 'auth-status high';
+            } finally {
+                resetCapture();
+            }
+        }
+
+        async function enrollPattern() {
+            const features = stopCapture();
+            if (!features) return;
+            
+            const userId = userIdInput.value.trim();
+            
+            try {
+                authStatus.textContent = 'Enrolling pattern...';
+                authStatus.className = 'auth-status medium';
+                
+                const response = await fetch('/enroll', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        user_id: userId,
+                        features: features,
+                        device_info: window.biometricCapture.deviceInfo
+                    })
+                });
+                
+                const result = await response.json();
+                displayEnrollmentResult(result);
+                
+            } catch (error) {
+                console.error('Enrollment error:', error);
+                authStatus.textContent = 'Enrollment failed: ' + error.message;
+                authStatus.className = 'auth-status high';
+            } finally {
+                resetCapture();
+            }
+        }
+
+        function resetCapture() {
+            isCapturing = false;
+            currentFeatures = null;
+            
+            // Reset UI
+            startCaptureBtn.disabled = false;
+            authenticateBtn.disabled = true;
+            enrollBtn.disabled = true;
+            typingArea.value = '';
+            typingArea.disabled = false;
+            
+            // Reset progress
+            progressBar.style.width = '0%';
+            progressBar.textContent = '0%';
+            
+            // Reset feature display
+            resetFeatureDisplay();
+            
+            authStatus.textContent = 'Ready for authentication';
+            authStatus.className = 'auth-status low';
+        }
+
+        function updateProgress() {
+            const text = typingArea.value;
+            const requiredLength = 50; // Minimum characters for good analysis
+            const progress = Math.min((text.length / requiredLength) * 100, 100);
+            
+            progressBar.style.width = progress + '%';
+            progressBar.textContent = Math.round(progress) + '%';
+            
+            // Enable authentication when enough text is typed
+            if (progress >= 100 && isCapturing) {
+                authenticateBtn.disabled = false;
+                enrollBtn.disabled = false;
+            }
+        }
+
+        function updateFeatureDisplay(features) {
+            document.getElementById('dwell-time').textContent = features.dwell_mean ? features.dwell_mean.toFixed(1) : '--';
+            document.getElementById('flight-time').textContent = features.flight_mean ? features.flight_mean.toFixed(1) : '--';
+            document.getElementById('typing-speed').textContent = features.typing_speed ? features.typing_speed.toFixed(1) : '--';
+            document.getElementById('rhythm-score').textContent = features.rhythm_consistency ? features.rhythm_consistency.toFixed(2) : '--';
+        }
+
+        function resetFeatureDisplay() {
+            document.getElementById('dwell-time').textContent = '--';
+            document.getElementById('flight-time').textContent = '--';
+            document.getElementById('typing-speed').textContent = '--';
+            document.getElementById('rhythm-score').textContent = '--';
+        }
+
+        function displayAuthenticationResult(result) {
+            let html = '<div class="alert ';
+            
+            if (result.verdict === 'genuine') {
+                html += 'alert-success">';
+                html += '<h4>✅ Authentication Successful</h4>';
+                authStatus.textContent = `Authenticated as ${result.user_id}`;
+                authStatus.className = 'auth-status low';
+            } else if (result.verdict === 'impostor') {
+                html += 'alert-danger">';
+                html += '<h4>🚨 Authentication Failed</h4>';
+                authStatus.textContent = 'Authentication failed - impostor detected';
+                authStatus.className = 'auth-status high';
+            } else {
+                html += 'alert-warning">';
+                html += '<h4>⚠️ Authentication Uncertain</h4>';
+                authStatus.textContent = 'Authentication uncertain - additional verification may be needed';
+                authStatus.className = 'auth-status medium';
+            }
+            
+            html += `
+                <p><strong>User:</strong> ${result.user_id}</p>
+                <p><strong>Verdict:</strong> ${result.verdict.toUpperCase()}</p>
+                <p><strong>Confidence:</strong> ${(result.confidence * 100).toFixed(1)}%</p>
+                <p><strong>Risk Level:</strong> <span class="risk-${result.risk_level}">${result.risk_level.toUpperCase()}</span></p>
+                <p><strong>Final Score:</strong> ${(result.final_score * 100).toFixed(1)}%</p>
+            `;
+            
+            if (result.scores) {
+                html += '<hr><h5>Detailed Scores:</h5>';
+                html += `<p>ML Average: ${(result.scores.ml_average * 100).toFixed(1)}%</p>`;
+                html += `<p>KNN Score: ${(result.scores.knn * 100).toFixed(1)}%</p>`;
+                html += `<p>SVM Score: ${(result.scores.svm * 100).toFixed(1)}%</p>`;
+                if (result.scores.typingdna) {
+                    html += `<p>TypingDNA: ${(result.scores.typingdna * 100).toFixed(1)}%</p>`;
+                }
+            }
+            
+            html += '</div>';
+            
+            resultsContainer.innerHTML = html;
+        }
+
+        function displayEnrollmentResult(result) {
+            let html = '<div class="alert alert-info">';
+            html += '<h4>📊 Enrollment Complete</h4>';
+            html += `<p><strong>User:</strong> ${result.user_id}</p>`;
+            html += `<p><strong>Enrollment Count:</strong> ${result.enrollment_count}</p>`;
+            
+            if (result.can_authenticate) {
+                html += '<p class="alert-success">✅ Ready for authentication</p>';
+            } else {
+                html += '<p class="alert-warning">⏳ More enrollments needed</p>';
+            }
+            
+            if (result.train_info) {
+                html += `<p><strong>Training Status:</strong> ${result.train_info}</p>`;
+            }
+            
+            html += '</div>';
+            
+            resultsContainer.innerHTML = html;
+            
+            authStatus.textContent = `Enrolled ${result.enrollment_count} samples for ${result.user_id}`;
+            authStatus.className = 'auth-status low';
+        }
+
+        function validateForm() {
+            const hasUserId = userIdInput.value.trim().length > 0;
+            startCaptureBtn.disabled = !hasUserId;
+        }
+
+        // Continuous Authentication Functions
+        function startContinuousAuth() {
+            const userId = userIdInput.value.trim();
+            if (!userId) {
+                alert('Please enter a User ID first');
+                return;
+            }
+            
+            continuousAuthActive = true;
+            
+            window.BiometricAuth.startContinuousAuth(userId, {
+                interval: 30000, // 30 seconds
+                onAuthResult: handleContinuousAuthResult,
+                onImpostorDetected: handleImpostorDetection
+            });
+            
+            startContinuousBtn.disabled = true;
+            stopContinuousBtn.disabled = false;
+            continuousStatus.textContent = `Continuous authentication active for ${userId}`;
+            continuousStatus.className = 'alert-info';
+        }
+
+        function stopContinuousAuth() {
+            continuousAuthActive = false;
+            
+            window.BiometricAuth.stopContinuousAuth();
+            
+            startContinuousBtn.disabled = false;
+            stopContinuousBtn.disabled = true;
+            continuousStatus.textContent = 'Continuous authentication is disabled';
+            continuousStatus.className = '';
+        }
+
+        function handleContinuousAuthResult(result) {
+            console.log('Continuous auth result:', result);
+            
+            // Update status quietly
+            if (result.verdict === 'genuine') {
+                authStatus.textContent = `Continuous auth: ${result.verdict} (${(result.confidence * 100).toFixed(1)}%)`;
+                authStatus.className = 'auth-status low';
+            } else if (result.risk_level === 'high') {
+                authStatus.textContent = `Continuous auth: ${result.risk_level} risk detected`;
+                authStatus.className = 'auth-status high';
+            }
+        }
+
+        function handleImpostorDetection(result) {
+            console.warn('Impostor detected in continuous auth:', result);
+            showStepUpModal();
+        }
+
+        // Step-up Authentication Functions
+        function showStepUpModal() {
+            stepUpModal.style.display = 'flex';
+            otpInput.focus();
+        }
+
+        function closeStepUpModal() {
+            stepUpModal.style.display = 'none';
+            otpInput.value = '';
+        }
+
+        async function verifyOTP() {
+            const otp = otpInput.value.trim();
+            
+            if (otp.length !== 6) {
+                alert('Please enter a 6-digit verification code');
+                return;
+            }
+            
+            try {
+                // In a real implementation, this would verify the OTP
+                console.log('Verifying OTP:', otp);
+                
+                // Simulate OTP verification
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                alert('Verification successful! Access granted.');
+                closeStepUpModal();
+                
+                authStatus.textContent = 'Step-up authentication completed';
+                authStatus.className = 'auth-status low';
+                
+            } catch (error) {
+                alert('Verification failed. Please try again.');
+                console.error('OTP verification error:', error);
+            }
+        }
+
+        // Page visibility handling for continuous auth
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden && continuousAuthActive) {
+                // Page is hidden, pause continuous auth
+                console.log('Page hidden, pausing continuous auth');
+            } else if (!document.hidden && continuousAuthActive) {
+                // Page is visible, resume continuous auth
+                console.log('Page visible, resuming continuous auth');
+            }
+        });
+    </script>
+</body>
+</html>
